@@ -5,17 +5,13 @@ import { z } from 'zod'
 import {
   User,
   Settings,
-  Bell,
   CreditCard,
   ShieldAlert,
   Upload,
   Copy,
-  LogOut,
   Building,
-  Check,
   Laptop,
   Smartphone,
-  Menu,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -29,7 +25,6 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -78,10 +73,9 @@ const passwordSchema = z.object({
 
 export default function SettingsPage() {
   const { toast } = useToast()
-  const { logout } = useAuthStore()
+  useAuthStore() // Keep store connected for potential future use
   const profile = useProfile()
   const [activeTab, setActiveTab] = useState('general')
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Forms
   const generalForm = useForm({

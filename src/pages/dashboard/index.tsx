@@ -35,6 +35,7 @@ import {
 import { RecentActivity } from '@/components/dashboard/recent-activity'
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts'
 import { AssignedTasks } from '@/components/dashboard/assigned-tasks'
+import { CreateChecklistDialog } from '@/components/checklist/create-checklist-dialog'
 import { formatRelativeTime } from '@/lib/utils'
 import { CHECKLIST_TEMPLATES } from '@/lib/templates-data'
 import type { ChecklistWithItems } from '@/types'

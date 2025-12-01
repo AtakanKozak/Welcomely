@@ -229,7 +229,7 @@ export async function addChecklistItem(checklistId: string, input: {
 // Update a checklist item
 export async function updateChecklistItem(id: string, input: {
   title?: string
-  description?: string
+  description?: string | null
   is_completed?: boolean
   due_date?: string | null
   order?: number

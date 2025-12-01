@@ -8,7 +8,6 @@ import {
   MoreVertical,
   Trash2,
   Clock,
-  CheckCircle2,
   Shield,
   User,
   Copy,

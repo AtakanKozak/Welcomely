@@ -206,7 +206,7 @@ export function useUpdateChecklistItem() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string; title?: string; description?: string; is_completed?: boolean; due_date?: string | null; assigned_to?: string | null }) =>
+    mutationFn: ({ id, ...data }: { id: string; title?: string; description?: string | null; is_completed?: boolean; due_date?: string | null; assigned_to?: string | null }) =>
       updateChecklistItem(id, data),
     onSuccess: (updatedItem) => {
       queryClient.invalidateQueries({ queryKey: checklistKeys.upcomingTasks() })
@@ -263,7 +263,7 @@ export function useDeleteChecklistItem() {
 
   return useMutation({
     mutationFn: deleteChecklistItem,
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: checklistKeys.upcomingTasks() })
       queryClient.invalidateQueries({ queryKey: checklistKeys.assignedToMe() })
       queryClient.invalidateQueries({ queryKey: checklistKeys.assignedToOthers() })

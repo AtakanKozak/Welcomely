@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import type { KeyboardEvent } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   DndContext,
@@ -29,7 +30,6 @@ import {
   Copy,
 } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -195,7 +195,7 @@ export function ChecklistDetailPage() {
     await updateItem.mutateAsync({ id: itemId, is_completed: isCompleted })
   }
 
-  const handleUpdateItem = async (itemId: string, data: { title?: string; description?: string; due_date?: string | null }) => {
+  const handleUpdateItem = async (itemId: string, data: { title?: string; description?: string | null; due_date?: string | null; assigned_to?: string | null }) => {
     // Optimistic update
     setItems(prev => prev.map(item =>
       item.id === itemId ? { ...item, ...data } : item
@@ -249,7 +249,7 @@ export function ChecklistDetailPage() {
 
   const handleUpdateCategory = async (value: string) => {
     if (!id) return
-    await updateChecklist.mutateAsync({ id, category: value === 'none' ? null : value })
+    await updateChecklist.mutateAsync({ id, category: value === 'none' ? undefined : value })
   }
 
   const handleCompleteAll = async () => {

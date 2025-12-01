@@ -1,10 +1,9 @@
 import {
-  CreditCard,
-  Monitor,
-  Smartphone,
   LayoutDashboard,
   Users,
   HardDrive,
+  Monitor,
+  Smartphone,
 } from 'lucide-react'
 
 export const BILLING_HISTORY = [

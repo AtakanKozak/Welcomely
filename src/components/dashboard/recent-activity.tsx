@@ -1,4 +1,4 @@
-import { CheckCircle2, Plus, Edit2, Clock } from 'lucide-react'
+import { CheckCircle2, Clock } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -6,13 +6,17 @@ interface ActivityItem {
   id: string
   title: string
   updated_at: string
-  checklists: {
-    title: string
-  }
+  checklists: { title: string } | { title: string }[] | null
 }
 
 interface RecentActivityProps {
   activities: ActivityItem[]
+}
+
+function getChecklistTitle(checklists: ActivityItem['checklists']): string {
+  if (!checklists) return 'Unknown'
+  if (Array.isArray(checklists)) return checklists[0]?.title || 'Unknown'
+  return checklists.title
 }
 
 export function RecentActivity({ activities }: RecentActivityProps) {
@@ -41,7 +45,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
                     Completed <span className="font-medium">{activity.title}</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    in {activity.checklists.title} • {formatRelativeTime(activity.updated_at)}
+                    in {getChecklistTitle(activity.checklists)} • {formatRelativeTime(activity.updated_at)}
                   </p>
                 </div>
               </div>

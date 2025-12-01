@@ -12,7 +12,6 @@ import {
   ChevronUp,
   MessageCircle,
   Send,
-  CheckCircle2,
   AlertTriangle,
 } from 'lucide-react'
 
@@ -30,7 +29,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { useProfile } from '@/hooks/use-auth'
-import { cn } from '@/lib/utils'
 
 // Validation Schema for Contact Form
 const contactSchema = z.object({
