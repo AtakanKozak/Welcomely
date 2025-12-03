@@ -183,14 +183,60 @@ export async function updateChecklist(id: string, input: {
   return data as Checklist
 }
 
-// Delete a checklist
+// Delete a checklist with proper cascade handling
 export async function deleteChecklist(id: string) {
-  const { error } = await supabase
-    .from('checklists')
-    .delete()
-    .eq('id', id)
+  try {
+    // Step 1: Delete all checklist items first (handles trigger issues)
+    const { error: itemsError } = await supabase
+      .from('checklist_items')
+      .delete()
+      .eq('checklist_id', id)
 
-  if (error) throw error
+    if (itemsError) {
+      console.error('Error deleting checklist items:', itemsError)
+      // Continue anyway - items might not exist or cascade will handle it
+    }
+
+    // Step 2: Delete user_progress records for this checklist
+    const { error: progressError } = await supabase
+      .from('user_progress')
+      .delete()
+      .eq('checklist_id', id)
+
+    if (progressError) {
+      console.error('Error deleting user progress:', progressError)
+      // Continue anyway - progress might not exist or cascade will handle it
+    }
+
+    // Step 3: Delete the checklist itself
+    const { error: checklistError } = await supabase
+      .from('checklists')
+      .delete()
+      .eq('id', id)
+
+    if (checklistError) {
+      console.error('DELETE CHECKLIST ERROR:', {
+        message: checklistError.message,
+        code: checklistError.code,
+        details: checklistError.details,
+        hint: checklistError.hint,
+      })
+      
+      // Provide user-friendly error message based on error code
+      if (checklistError.code === '23503') {
+        throw new Error('Cannot delete: This checklist has related data that prevents deletion')
+      } else if (checklistError.code === '42501') {
+        throw new Error('Permission denied: You do not have permission to delete this checklist')
+      } else {
+        throw new Error(checklistError.message || 'Failed to delete checklist')
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Delete checklist failed:', error)
+    throw error
+  }
 }
 
 // Add an item to a checklist
@@ -283,7 +329,7 @@ export async function getAssignedToMeTasks() {
     .select(ASSIGNED_TASK_SELECT)
     .eq('assigned_to', user.id)
     .eq('is_completed', false)
-    .order('due_date', { ascending: true })
+    .order('due_date', { ascending: true, nullsFirst: false })
     .limit(10)
 
   if (error) throw error
@@ -302,7 +348,7 @@ export async function getAssignedToOthersTasks() {
     .not('assigned_to', 'is', null)
     .neq('assigned_to', user.id)
     .eq('is_completed', false)
-    .order('due_date', { ascending: true })
+    .order('due_date', { ascending: true, nullsFirst: false })
     .limit(10)
 
   if (error) throw error
@@ -321,8 +367,6 @@ export async function getDashboardStats() {
       *,
       checklist_items (*)
     `)
-    // No filtering by user_id here, rely on RLS to return accessible checklists
-    // But we might want to distinguish between "my checklists" and "team checklists" in the UI later
 
   if (error) throw error
 
@@ -399,24 +443,16 @@ export async function getDashboardStats() {
 }
 
 // Get today's tasks
-function getUtcDateRange(daysAhead: number) {
-  const startUtc = new Date()
-  startUtc.setUTCHours(0, 0, 0, 0)
-
-  const endUtc = new Date(startUtc)
-  endUtc.setUTCDate(endUtc.getUTCDate() + daysAhead)
-  endUtc.setUTCHours(23, 59, 59, 999)
-
-  return { startUtc, endUtc }
-}
-
 export async function getTodaysTasks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { startUtc, endUtc } = getUtcDateRange(0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const endOfToday = new Date(today)
+  endOfToday.setHours(23, 59, 59, 999)
 
-  // Include tasks assigned to me OR tasks in my checklists
   const { data, error } = await supabase
     .from('checklist_items')
     .select(`
@@ -427,10 +463,9 @@ export async function getTodaysTasks() {
         user_id
       )
     `)
-    .or(`assigned_to.eq.${user.id},checklists.user_id.eq.${user.id}`)
     .not('due_date', 'is', null)
-    .gte('due_date', startUtc.toISOString())
-    .lte('due_date', endUtc.toISOString())
+    .gte('due_date', today.toISOString())
+    .lte('due_date', endOfToday.toISOString())
     .eq('is_completed', false)
     .order('due_date', { ascending: true })
 
@@ -438,12 +473,15 @@ export async function getTodaysTasks() {
   return data
 }
 
-// Get upcoming tasks (next 7 days)
+// Get upcoming tasks (includes overdue + next 7 days)
 export async function getUpcomingTasks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { startUtc, endUtc } = getUtcDateRange(7)
+  // Get tasks from the past (overdue) up to 7 days in the future
+  const sevenDaysFromNow = new Date()
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
+  sevenDaysFromNow.setHours(23, 59, 59, 999)
 
   const { data, error } = await supabase
     .from('checklist_items')
@@ -455,11 +493,9 @@ export async function getUpcomingTasks() {
         user_id
       )
     `)
-    .or(`assigned_to.eq.${user.id},checklists.user_id.eq.${user.id}`)
     .not('due_date', 'is', null)
-    .gte('due_date', startUtc.toISOString())
-    .lte('due_date', endUtc.toISOString())
-    .order('is_completed', { ascending: true })
+    .lte('due_date', sevenDaysFromNow.toISOString())
+    .eq('is_completed', false)
     .order('due_date', { ascending: true })
     .limit(15)
 

@@ -1,7 +1,8 @@
+import { useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Calendar, ArrowRight, CheckCircle2, Circle, Users } from 'lucide-react'
+import { Calendar, ArrowRight, CheckCircle2, Circle, Users, Loader2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import {
@@ -35,8 +36,26 @@ export function AssignedTasks() {
   const { data: teammateTasks, isLoading: loadingOthers } = useAssignedToOthersTasks()
   const toggleCompletion = useToggleItemCompletion()
   const { toast } = useToast()
+  
+  // Track which tasks are currently being toggled for optimistic UI
+  const [pendingToggles, setPendingToggles] = useState<Set<string>>(new Set())
+  // Track optimistically completed tasks for instant UI feedback
+  const [optimisticCompletions, setOptimisticCompletions] = useState<Set<string>>(new Set())
 
-  const handleToggle = async (id: string, isCompleted: boolean) => {
+  const handleToggle = useCallback(async (id: string, isCompleted: boolean) => {
+    // Immediately update UI
+    setPendingToggles(prev => new Set(prev).add(id))
+    
+    if (isCompleted) {
+      setOptimisticCompletions(prev => new Set(prev).add(id))
+    } else {
+      setOptimisticCompletions(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+
     try {
       await toggleCompletion.mutateAsync({ id, isCompleted })
       toast({
@@ -44,17 +63,41 @@ export function AssignedTasks() {
         description: isCompleted ? 'Great job! Keep it up.' : 'Task marked as incomplete.',
       })
     } catch (error) {
+      // Rollback optimistic update
+      if (isCompleted) {
+        setOptimisticCompletions(prev => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      } else {
+        setOptimisticCompletions(prev => new Set(prev).add(id))
+      }
       toast({
         title: 'Error',
         description: 'Failed to update task status.',
         variant: 'destructive',
       })
+    } finally {
+      setPendingToggles(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     }
-  }
+  }, [toggleCompletion, toast])
 
   if (loadingMine || loadingOthers) {
     return <TaskSkeleton />
   }
+
+  // Filter out optimistically completed tasks from the list for instant removal
+  const filteredMyTasks = (myTasks || []).filter(
+    task => !optimisticCompletions.has(task.id)
+  )
+  const filteredTeammateTasks = (teammateTasks || []).filter(
+    task => !optimisticCompletions.has(task.id)
+  )
 
   return (
     <Card>
@@ -74,7 +117,7 @@ export function AssignedTasks() {
         <TaskSection
           title="Assigned to me"
           description="Tasks you need to complete"
-          tasks={myTasks || []}
+          tasks={filteredMyTasks}
           emptyMessage="No tasks assigned to you yet."
           emptyCta={
             <Button variant="link" className="mt-1 h-auto p-0" asChild>
@@ -82,14 +125,14 @@ export function AssignedTasks() {
             </Button>
           }
           onToggle={handleToggle}
-          togglePending={toggleCompletion.isPending}
+          pendingToggles={pendingToggles}
           showAssigneeLabel={false}
         />
         <TaskSection
           title="Assigned to teammates"
           description="Tasks you've delegated to others"
           icon={<Users className="h-4 w-4 text-muted-foreground" />}
-          tasks={teammateTasks || []}
+          tasks={filteredTeammateTasks}
           emptyMessage="No delegated tasks yet. Assign tasks to keep everyone accountable."
           emptyCta={
             <Button variant="link" className="mt-1 h-auto p-0" asChild>
@@ -97,7 +140,7 @@ export function AssignedTasks() {
             </Button>
           }
           onToggle={handleToggle}
-          togglePending={toggleCompletion.isPending}
+          pendingToggles={pendingToggles}
           showAssigneeLabel
         />
       </CardContent>
@@ -112,7 +155,7 @@ interface TaskSectionProps {
   emptyMessage: string
   emptyCta?: ReactNode
   onToggle: (id: string, isCompleted: boolean) => void
-  togglePending: boolean
+  pendingToggles: Set<string>
   showAssigneeLabel?: boolean
   icon?: React.ReactNode
 }
@@ -124,7 +167,7 @@ function TaskSection({
   emptyMessage,
   emptyCta,
   onToggle,
-  togglePending,
+  pendingToggles,
   showAssigneeLabel,
   icon,
 }: TaskSectionProps) {
@@ -141,68 +184,76 @@ function TaskSection({
       </div>
       {tasks.length > 0 ? (
         <div className="space-y-3">
-          {tasks.map((task) => (
-            <div
-              key={task.id}
-              className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/40 transition-colors group"
-            >
-              <button
-                onClick={() => onToggle(task.id, !task.is_completed)}
-                disabled={togglePending}
+          {tasks.map((task) => {
+            const isPending = pendingToggles.has(task.id)
+            return (
+              <div
+                key={task.id}
                 className={cn(
-                  'mt-0.5 text-muted-foreground hover:text-primary transition-colors',
-                  togglePending && 'opacity-50 cursor-not-allowed'
+                  "flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/40 transition-all group",
+                  isPending && "opacity-70"
                 )}
               >
-                {task.is_completed ? (
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                ) : (
-                  <Circle className="h-5 w-5" />
-                )}
-              </button>
-              <Avatar className="h-8 w-8 mt-0.5">
-                <AvatarImage src={task.assignee?.avatar_url || undefined} />
-                <AvatarFallback className="text-xs">
-                  {getAssigneeInitials(task.assignee)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col">
-                  <span
-                    className={cn(
-                      'font-medium truncate',
-                      task.is_completed && 'line-through text-muted-foreground'
-                    )}
-                  >
-                    {task.title}
-                  </span>
-                  <Link
-                    to={`/checklists/${task.checklists.id}`}
-                    className="text-xs text-muted-foreground hover:text-primary transition-colors truncate"
-                  >
-                    in {task.checklists.title}
-                  </Link>
-                </div>
-                {showAssigneeLabel && task.assignee && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Assigned to {task.assignee.full_name || task.assignee.email}
-                  </p>
-                )}
-              </div>
-              {task.due_date && (
-                <div
+                <button
+                  onClick={() => onToggle(task.id, !task.is_completed)}
+                  disabled={isPending}
                   className={cn(
-                    'flex items-center text-xs whitespace-nowrap px-2 py-1 rounded-full bg-muted',
-                    isOverdue(task.due_date) && 'text-destructive bg-destructive/10',
-                    isToday(task.due_date) && 'text-orange-500 bg-orange-500/10'
+                    'mt-0.5 text-muted-foreground hover:text-primary transition-colors',
+                    isPending && 'cursor-wait'
                   )}
                 >
-                  <Calendar className="mr-1 h-3 w-3" />
-                  {formatDate(task.due_date)}
+                  {isPending ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  ) : task.is_completed ? (
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Circle className="h-5 w-5" />
+                  )}
+                </button>
+                <Avatar className="h-8 w-8 mt-0.5">
+                  <AvatarImage src={task.assignee?.avatar_url || undefined} />
+                  <AvatarFallback className="text-xs">
+                    {getAssigneeInitials(task.assignee)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col">
+                    <span
+                      className={cn(
+                        'font-medium truncate',
+                        task.is_completed && 'line-through text-muted-foreground'
+                      )}
+                    >
+                      {task.title}
+                    </span>
+                    <Link
+                      to={`/checklists/${task.checklists.id}`}
+                      className="text-xs text-muted-foreground hover:text-primary transition-colors truncate"
+                    >
+                      in {task.checklists.title}
+                    </Link>
+                  </div>
+                  {showAssigneeLabel && task.assignee && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Assigned to {task.assignee.full_name || task.assignee.email}
+                    </p>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+                {task.due_date && (
+                  <div
+                    className={cn(
+                      'flex items-center text-xs whitespace-nowrap px-2 py-1 rounded-full bg-muted',
+                      isOverdue(task.due_date) && 'text-destructive bg-destructive/10',
+                      isToday(task.due_date) && 'text-orange-500 bg-orange-500/10'
+                    )}
+                  >
+                    <Calendar className="mr-1 h-3 w-3" />
+                    {formatDate(task.due_date)}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       ) : (
         <div className="text-center py-6 text-muted-foreground text-sm">
@@ -279,4 +330,3 @@ function getAssigneeInitials(
   }
   return assignee.email?.charAt(0)?.toUpperCase() || '?'
 }
-

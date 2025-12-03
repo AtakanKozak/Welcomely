@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CheckSquare,
@@ -31,11 +32,13 @@ import {
   useDeleteChecklist,
   useCreateChecklist,
   useDuplicateChecklist,
+  useUpdateChecklist,
 } from '@/hooks/use-checklists'
 import { RecentActivity } from '@/components/dashboard/recent-activity'
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts'
 import { AssignedTasks } from '@/components/dashboard/assigned-tasks'
 import { CreateChecklistDialog } from '@/components/checklist/create-checklist-dialog'
+import { ShareChecklistDialog } from '@/components/checklist/share-checklist-dialog'
 import { formatRelativeTime } from '@/lib/utils'
 import { CHECKLIST_TEMPLATES } from '@/lib/templates-data'
 import type { ChecklistWithItems } from '@/types'
@@ -138,12 +141,18 @@ export function DashboardPage() {
   const { profile } = useAuthStore()
   const firstName = profile?.full_name?.split(' ')[0] || 'there'
 
+  // Share dialog state
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [shareChecklistId, setShareChecklistId] = useState<string | null>(null)
+  const [shareChecklistIsPublic, setShareChecklistIsPublic] = useState(false)
+
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats()
   const { data: checklists, isLoading: checklistsLoading, error: checklistsError } = useChecklists()
   const { data: upcomingTasks, isLoading: tasksLoading } = useUpcomingTasks()
   const deleteChecklist = useDeleteChecklist()
   const createChecklist = useCreateChecklist()
   const duplicateChecklist = useDuplicateChecklist()
+  const updateChecklist = useUpdateChecklist()
 
   const recentChecklists = checklists?.slice(0, 4) || []
   const quickTemplates = CHECKLIST_TEMPLATES.slice(0, 3)
@@ -181,16 +190,32 @@ export function DashboardPage() {
       change: 'Tasks for you',
       changeType: 'neutral' as const,
       icon: TrendingUp,
-      link: '/checklists', // Ideally filter for assigned tasks
+      link: '/checklists',
     },
   ]
 
   const handleDeleteChecklist = async (id: string) => {
-    if (confirm('Are you sure you want to delete this checklist?')) {
+    try {
       await deleteChecklist.mutateAsync(id)
       toast({
         title: 'Checklist deleted',
         description: 'The checklist was removed successfully.',
+      })
+    } catch (error: any) {
+      console.error('DELETE ERROR:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        stack: error?.stack,
+      })
+      
+      // Show specific error message if available
+      const errorMessage = error?.message || 'Failed to delete checklist. Please try again.'
+      toast({
+        title: 'Error deleting checklist',
+        description: errorMessage,
+        variant: 'destructive',
       })
     }
   }
@@ -232,18 +257,27 @@ export function DashboardPage() {
     }
   }
 
-  const handleShareChecklist = async (id: string) => {
+  const handleOpenShareDialog = (checklist: ChecklistWithItems) => {
+    setShareChecklistId(checklist.id)
+    setShareChecklistIsPublic(!!checklist.is_public)
+    setShareDialogOpen(true)
+  }
+
+  const handleTogglePublic = async (value: boolean) => {
+    if (!shareChecklistId) return
     try {
-      const shareUrl = `${window.location.origin}/shared/${id}`
-      await navigator.clipboard.writeText(shareUrl)
+      await updateChecklist.mutateAsync({ id: shareChecklistId, is_public: value })
+      setShareChecklistIsPublic(value)
       toast({
-        title: 'Share link copied',
-        description: 'Anyone with the link can view this checklist.',
+        title: value ? 'Checklist is now public' : 'Checklist is now private',
+        description: value 
+          ? 'Anyone with the link can view this checklist.' 
+          : 'Only you can view this checklist.',
       })
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to copy share link.',
+        description: 'Failed to update share settings.',
         variant: 'destructive',
       })
     }
@@ -424,7 +458,7 @@ export function DashboardPage() {
                             </Link>
                           </Button>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.preventDefault()}>
+                            <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="shrink-0">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
@@ -434,18 +468,22 @@ export function DashboardPage() {
                                 <Link to={`/checklists/${checklist.id}`}>Edit</Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleDuplicateChecklist(checklist.id)}
+                                onSelect={() => handleDuplicateChecklist(checklist.id)}
                               >
                                 Duplicate
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleShareChecklist(checklist.id)}
+                                onSelect={() => handleOpenShareDialog(checklist)}
                               >
                                 Share
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                className="text-destructive"
-                                onClick={() => handleDeleteChecklist(checklist.id)}
+                                className="text-destructive focus:text-destructive"
+                                onSelect={() => {
+                                  if (confirm('Are you sure you want to delete this checklist? This action cannot be undone.')) {
+                                    handleDeleteChecklist(checklist.id)
+                                  }
+                                }}
                               >
                                 Delete
                               </DropdownMenuItem>
@@ -473,7 +511,7 @@ export function DashboardPage() {
                 <Calendar className="h-5 w-5" />
                 Upcoming Tasks
               </CardTitle>
-              <CardDescription>Tasks due in the next 7 days</CardDescription>
+              <CardDescription>Tasks due soon or overdue</CardDescription>
             </CardHeader>
             <CardContent>
               {tasksLoading ? (
@@ -489,7 +527,7 @@ export function DashboardPage() {
                     No upcoming tasks
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Tasks with due dates will appear here
+                    Add due dates to your tasks to see them here
                   </p>
                 </div>
               ) : (
@@ -577,6 +615,20 @@ export function DashboardPage() {
           </Card>
         </div>
       </div>
+
+      {/* Share Dialog */}
+      {shareChecklistId && (
+        <ShareChecklistDialog
+          open={shareDialogOpen}
+          onClose={() => {
+            setShareDialogOpen(false)
+            setShareChecklistId(null)
+          }}
+          checklistId={shareChecklistId}
+          isPublic={shareChecklistIsPublic}
+          onTogglePublic={handleTogglePublic}
+        />
+      )}
     </div>
   )
 }

@@ -1,0 +1,81 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="welcomely-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A855F7" />
+      <stop offset="50%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+    <linearGradient id="welcomely-gradient-2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#22D3EE" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Left V of the W - Purple side -->
+  <path
+    d="M10 20 L25 75 L40 45"
+    stroke="url(#welcomely-gradient)"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  
+  <!-- Right V of the W with checkmark integration - Cyan side -->
+  <path
+    d="M40 45 L55 75 L75 30"
+    stroke="url(#welcomely-gradient-2)"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  
+  <!-- Connection line going up with nodes -->
+  <path
+    d="M75 30 L85 15"
+    stroke="#22D3EE"
+    stroke-width="4"
+    stroke-linecap="round"
+  />
+  
+  <!-- Top connection node -->
+  <circle
+    cx="85"
+    cy="12"
+    r="5"
+    fill="none"
+    stroke="#22D3EE"
+    stroke-width="3"
+  />
+  
+  <!-- Second connection line -->
+  <path
+    d="M70 40 L80 30"
+    stroke="#06B6D4"
+    stroke-width="3"
+    stroke-linecap="round"
+    opacity="0.8"
+  />
+  
+  <!-- Second node -->
+  <circle
+    cx="82"
+    cy="28"
+    r="4"
+    fill="none"
+    stroke="#06B6D4"
+    stroke-width="2.5"
+    opacity="0.8"
+  />
+  
+  <!-- Small accent at the tip -->
+  <path
+    d="M55 78 L58 85"
+    stroke="#22D3EE"
+    stroke-width="5"
+    stroke-linecap="round"
+    opacity="0.6"
+  />
+</svg>
+

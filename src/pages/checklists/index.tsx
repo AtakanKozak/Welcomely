@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus,
@@ -33,6 +33,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import { useChecklists, useDeleteChecklist, useDuplicateChecklist } from '@/hooks/use-checklists'
+import { useDebounce } from '@/hooks/use-debounce'
 import { CreateChecklistDialog } from '@/components/checklist/create-checklist-dialog'
 import type { ChecklistWithItems } from '@/types'
 import { useToast } from '@/hooks/use-toast'
@@ -84,35 +85,39 @@ export function ChecklistsPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  
+  // Debounce search query with 300ms delay for better performance
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
   const { data: checklists, isLoading, error } = useChecklists()
   const deleteChecklist = useDeleteChecklist()
   const duplicateChecklist = useDuplicateChecklist()
 
-  // Filter checklists
-  const filteredChecklists = (checklists || []).filter((checklist) => {
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      const matchesTitle = checklist.title.toLowerCase().includes(query)
-      const matchesDescription = checklist.description?.toLowerCase().includes(query)
-      const matchesCategory = checklist.category?.toLowerCase().includes(query)
-      if (!matchesTitle && !matchesDescription && !matchesCategory) {
-        return false
+  // Filter checklists with memoization for performance
+  const filteredChecklists = useMemo(() => {
+    return (checklists || []).filter((checklist) => {
+      // Search filter using debounced query
+      if (debouncedSearchQuery) {
+        const query = debouncedSearchQuery.toLowerCase()
+        const matchesTitle = checklist.title.toLowerCase().includes(query)
+        const matchesDescription = checklist.description?.toLowerCase().includes(query)
+        const matchesCategory = checklist.category?.toLowerCase().includes(query)
+        if (!matchesTitle && !matchesDescription && !matchesCategory) {
+          return false
+        }
       }
-    }
 
-    // Status filter
-    const progress = calculateProgress(checklist)
-    if (filter === 'completed') return progress.percentage === 100
-    if (filter === 'in-progress') return progress.percentage > 0 && progress.percentage < 100
-    if (filter === 'not-started') return progress.percentage === 0 && progress.total > 0
-    if (filter === 'empty') return progress.total === 0
-    return true
-  })
+      // Status filter
+      const progress = calculateProgress(checklist)
+      if (filter === 'completed') return progress.percentage === 100
+      if (filter === 'in-progress') return progress.percentage > 0 && progress.percentage < 100
+      if (filter === 'not-started') return progress.percentage === 0 && progress.total > 0
+      if (filter === 'empty') return progress.total === 0
+      return true
+    })
+  }, [checklists, debouncedSearchQuery, filter])
 
   const handleCardClick = (checklistId: string) => {
-    console.log('Navigating to checklist:', checklistId)
     navigate(`/checklists/${checklistId}`)
   }
 
