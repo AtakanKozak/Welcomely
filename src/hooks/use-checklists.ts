@@ -18,7 +18,7 @@ import {
   getPublicChecklist,
   duplicateChecklist,
 } from '@/lib/api/checklists'
-import type { ChecklistWithItems, ChecklistItem, Checklist } from '@/types'
+import type { ChecklistWithItems, ChecklistItem } from '@/types'
 import type { ChecklistTemplate } from '@/lib/templates-data'
 
 // Query keys
@@ -328,7 +328,7 @@ export function useAddChecklistItem() {
         }
       )
     },
-    onSettled: (_data, _error, variables) => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: checklistKeys.lists() })
       queryClient.invalidateQueries({ queryKey: checklistKeys.stats() })
       queryClient.invalidateQueries({ queryKey: checklistKeys.upcomingTasks() })

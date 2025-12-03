@@ -52,6 +52,7 @@ export function useInviteTeamMember() {
           status: 'pending',
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }
         
         queryClient.setQueryData<TeamInvite[]>(

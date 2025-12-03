@@ -26,7 +26,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
   callback: T,
   delay: number = 300
 ): T {
-  const timeoutRef = useMemo(() => ({ current: null as NodeJS.Timeout | null }), [])
+  const timeoutRef = useMemo(() => ({ current: null as ReturnType<typeof setTimeout> | null }), [])
 
   const debouncedCallback = useCallback(
     (...args: Parameters<T>) => {
