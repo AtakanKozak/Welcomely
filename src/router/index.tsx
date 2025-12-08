@@ -3,6 +3,8 @@ import { MainLayout } from '@/components/layout/main-layout'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { LoginPage } from '@/pages/auth/login'
 import { SignupPage } from '@/pages/auth/signup'
+import { AuthCallbackPage } from '@/pages/auth/callback'
+import { ResetPasswordPage } from '@/pages/auth/reset-password'
 import { DashboardPage } from '@/pages/dashboard'
 import { ChecklistsPage } from '@/pages/checklists'
 import { ChecklistDetailPage } from '@/pages/checklists/[id]'
@@ -17,6 +19,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <Navigate to="/dashboard" replace />,
   },
+  // Auth routes
   {
     path: '/login',
     element: <LoginPage />,
@@ -26,9 +29,21 @@ export const router = createBrowserRouter([
     element: <SignupPage />,
   },
   {
+    // OAuth callback handler - handles redirects from Google, email verification, etc.
+    path: '/auth/callback',
+    element: <AuthCallbackPage />,
+  },
+  {
+    // Password reset page - users arrive here after clicking reset link in email
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
+  },
+  // Public routes
+  {
     path: '/shared/:id',
     element: <SharedChecklistPage />,
   },
+  // Protected routes (require authentication)
   {
     path: '/',
     element: (
@@ -71,5 +86,10 @@ export const router = createBrowserRouter([
         element: <HelpPage />,
       },
     ],
+  },
+  {
+    // Catch-all route - redirect unknown paths to dashboard
+    path: '*',
+    element: <Navigate to="/dashboard" replace />,
   },
 ])
