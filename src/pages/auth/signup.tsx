@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/components/shared/logo'
 import { ThemeToggle } from '@/components/shared/theme-toggle'
+import { VideoBackground } from '@/components/shared/video-background'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 import { TermsOfServiceModal, PrivacyPolicyModal } from '@/components/legal'
@@ -54,68 +55,6 @@ const signupSchema = z.object({
 
 type SignupFormData = z.infer<typeof signupSchema>
 
-// Animated particle component
-function Particle({ delay, duration, size, left, top }: { 
-  delay: number
-  duration: number
-  size: number
-  left: number
-  top: number 
-}) {
-  return (
-    <div
-      className="absolute rounded-full bg-white/20 animate-pulse"
-      style={{
-        width: size,
-        height: size,
-        left: `${left}%`,
-        top: `${top}%`,
-        animationDelay: `${delay}s`,
-        animationDuration: `${duration}s`,
-      }}
-    />
-  )
-}
-
-// Animated stars background
-function AnimatedBackground() {
-  const [particles, setParticles] = useState<Array<{
-    id: number
-    delay: number
-    duration: number
-    size: number
-    left: number
-    top: number
-  }>>([])
-
-  useEffect(() => {
-    const newParticles = Array.from({ length: 50 }, (_, i) => ({
-      id: i,
-      delay: Math.random() * 5,
-      duration: 3 + Math.random() * 4,
-      size: 1 + Math.random() * 3,
-      left: Math.random() * 100,
-      top: Math.random() * 100,
-    }))
-    setParticles(newParticles)
-  }, [])
-
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/90 via-purple-800/80 to-violet-900/90" />
-      <div className="absolute top-1/3 -left-32 w-96 h-96 bg-indigo-500/30 rounded-full blur-3xl animate-pulse" 
-           style={{ animationDuration: '10s' }} />
-      <div className="absolute bottom-1/3 -right-32 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" 
-           style={{ animationDuration: '8s', animationDelay: '3s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-violet-500/10 rounded-full blur-3xl animate-pulse" 
-           style={{ animationDuration: '15s', animationDelay: '1s' }} />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
-      {particles.map((particle) => (
-        <Particle key={particle.id} {...particle} />
-      ))}
-    </div>
-  )
-}
 
 // Stats card component
 function StatsCard({ value, label }: { value: string; label: string }) {
@@ -425,7 +364,7 @@ export function SignupPage() {
     return (
       <div className="min-h-screen flex">
         <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-          <AnimatedBackground />
+          <VideoBackground overlayOpacity={0.5} />
           <div className="relative z-10 flex flex-col justify-center p-12 text-white w-full">
             <div className="max-w-md">
               <Logo className="mb-10" size="lg" />
@@ -449,9 +388,9 @@ export function SignupPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Animated Background */}
+      {/* Left Side - Video Background */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <AnimatedBackground />
+        <VideoBackground overlayOpacity={0.5} />
         
         <div className="relative z-10 flex flex-col justify-center p-12 text-white w-full">
           <div className="max-w-md">
