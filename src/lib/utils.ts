@@ -34,3 +34,48 @@ export function calculateProgress(completed: number, total: number): number {
   return Math.round((completed / total) * 100)
 }
 
+/**
+ * Get initials from a name
+ * "John Doe" -> "JD"
+ * "john@example.com" -> "JO"
+ * "John" -> "JO"
+ */
+export function getInitials(name: string | null | undefined): string {
+  if (!name) return '?'
+  
+  // If it's an email, use the first part
+  const displayName = name.includes('@') ? name.split('@')[0] : name
+  
+  const parts = displayName.trim().split(/\s+/)
+  
+  if (parts.length === 1) {
+    return parts[0].substring(0, 2).toUpperCase()
+  }
+  
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+/**
+ * Get time-based greeting
+ */
+export function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+/**
+ * Get first name from full name
+ */
+export function getFirstName(fullName: string | null | undefined): string {
+  if (!fullName) return 'there'
+  
+  // If it's an email, use the first part
+  if (fullName.includes('@')) {
+    return fullName.split('@')[0].split('.')[0]
+  }
+  
+  return fullName.split(' ')[0]
+}
+

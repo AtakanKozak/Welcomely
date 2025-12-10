@@ -11,6 +11,7 @@ import { ChecklistDetailPage } from '@/pages/checklists/[id]'
 import { TemplatesPage } from '@/pages/templates'
 import { SharedChecklistPage } from '@/pages/shared/checklist-view'
 import TeamPage from '@/pages/team'
+import JoinTeamPage from '@/pages/team/join'
 import SettingsPage from '@/pages/settings'
 import HelpPage from '@/pages/help'
 
@@ -42,6 +43,11 @@ export const router = createBrowserRouter([
   {
     path: '/shared/:id',
     element: <SharedChecklistPage />,
+  },
+  {
+    // Team invitation acceptance page
+    path: '/join-team',
+    element: <JoinTeamPage />,
   },
   // Protected routes (require authentication)
   {

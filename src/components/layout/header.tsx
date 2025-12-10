@@ -17,13 +17,14 @@ import { Logo } from '@/components/shared/logo'
 import { useAuthStore } from '@/stores/auth-store'
 import { useChecklists } from '@/hooks/use-checklists'
 import { CHECKLIST_TEMPLATES } from '@/lib/templates-data'
+import { getInitials } from '@/lib/utils'
 
 interface HeaderProps {
   onMenuClick?: () => void
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { profile, logout } = useAuthStore()
+  const { profile, user, logout } = useAuthStore()
   const navigate = useNavigate()
   const searchContainerRef = useRef<HTMLDivElement>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -79,11 +80,10 @@ export function Header({ onMenuClick }: HeaderProps) {
   const showResults = isSearchActive && normalizedQuery.length > 0
   const hasResults = checklistResults.length > 0 || templateResults.length > 0
 
-  const initials = profile?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase() || 'U'
+  // Get user display info with fallbacks
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
+  const displayEmail = profile?.email || user?.email || ''
+  const initials = getInitials(displayName)
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 lg:px-6">
@@ -232,10 +232,10 @@ export function Header({ onMenuClick }: HeaderProps) {
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">
-                  {profile?.full_name || 'User'}
+                  {displayName}
                 </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {profile?.email}
+                  {displayEmail}
                 </p>
               </div>
             </DropdownMenuLabel>

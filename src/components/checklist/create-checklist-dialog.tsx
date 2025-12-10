@@ -29,6 +29,7 @@ import {
 import { useCreateChecklist, checklistKeys } from '@/hooks/use-checklists'
 import { CHECKLIST_CATEGORIES } from '@/types'
 import { getChecklist } from '@/lib/api/checklists'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const createChecklistSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
@@ -50,6 +51,7 @@ export function CreateChecklistDialog({ trigger, onSuccess }: CreateChecklistDia
   const navigate = useNavigate()
   const createChecklist = useCreateChecklist()
   const queryClient = useQueryClient()
+  const { activeWorkspaceId, initializeWorkspace } = useWorkspaceStore()
 
   const {
     register,
@@ -75,10 +77,16 @@ export function CreateChecklistDialog({ trigger, onSuccess }: CreateChecklistDia
     setIsSubmitting(true)
     
     try {
+      const workspaceId = activeWorkspaceId ?? await initializeWorkspace()
+      if (!workspaceId) {
+        throw new Error('No active workspace. Please try again.')
+      }
+
       const checklist = await createChecklist.mutateAsync({
         title: data.title,
         description: data.description || undefined,
         category: data.category || undefined,
+        workspaceId,
       })
       
       console.log('Checklist created successfully:', checklist)

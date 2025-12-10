@@ -76,7 +76,7 @@ Create seamless onboarding experiences with intelligent workflows and automated 
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 18+ 
 - npm or yarn
 - Supabase account
 

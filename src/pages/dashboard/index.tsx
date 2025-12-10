@@ -34,12 +34,13 @@ import {
   useDuplicateChecklist,
   useUpdateChecklist,
 } from '@/hooks/use-checklists'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import { RecentActivity } from '@/components/dashboard/recent-activity'
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts'
 import { AssignedTasks } from '@/components/dashboard/assigned-tasks'
 import { CreateChecklistDialog } from '@/components/checklist/create-checklist-dialog'
 import { ShareChecklistDialog } from '@/components/checklist/share-checklist-dialog'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, getFirstName, getGreeting } from '@/lib/utils'
 import { CHECKLIST_TEMPLATES } from '@/lib/templates-data'
 import type { ChecklistWithItems } from '@/types'
 import { useToast } from '@/hooks/use-toast'
@@ -138,8 +139,8 @@ function getDueDateMeta(dueDate: string) {
 export function DashboardPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { profile } = useAuthStore()
-  const firstName = profile?.full_name?.split(' ')[0] || 'there'
+  const { profile, user } = useAuthStore()
+  const firstName = getFirstName(profile?.full_name || user?.user_metadata?.full_name || user?.email)
 
   // Share dialog state
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
@@ -153,6 +154,7 @@ export function DashboardPage() {
   const createChecklist = useCreateChecklist()
   const duplicateChecklist = useDuplicateChecklist()
   const updateChecklist = useUpdateChecklist()
+  const { activeWorkspaceId, initializeWorkspace } = useWorkspaceStore()
 
   const recentChecklists = checklists?.slice(0, 4) || []
   const quickTemplates = CHECKLIST_TEMPLATES.slice(0, 3)
@@ -222,9 +224,13 @@ export function DashboardPage() {
 
   const handleQuickCreate = async () => {
     try {
+      const workspaceId = activeWorkspaceId ?? await initializeWorkspace()
+      if (!workspaceId) throw new Error('No active workspace')
+
       const checklist = await createChecklist.mutateAsync({
         title: 'Untitled Checklist',
         description: '',
+        workspaceId,
       })
       toast({
         title: 'Checklist created',
@@ -281,13 +287,6 @@ export function DashboardPage() {
         variant: 'destructive',
       })
     }
-  }
-
-  const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 18) return 'Good afternoon'
-    return 'Good evening'
   }
 
   const getMotivationalMessage = () => {

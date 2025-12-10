@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/types'
 import type { User } from '@supabase/supabase-js'
+import { clearWorkspaceCache } from '@/lib/workspace'
 
 /**
  * Supabase Dashboard Configuration Required:
@@ -287,6 +288,7 @@ export const useAuthStore = create<AuthState>()(
         
         try {
           await supabase.auth.signOut()
+          clearWorkspaceCache()
         } catch (error) {
           console.error('[Auth] Logout error:', error)
         }
@@ -300,18 +302,70 @@ export const useAuthStore = create<AuthState>()(
         console.log('[Auth] Fetching profile for:', user.id)
         
         try {
-          const { data, error } = await supabase
+          // First try to get existing profile
+          let { data, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', user.id)
             .single()
 
-          if (error) {
+          // If no profile exists, create one from user metadata
+          if (error && error.code === 'PGRST116') {
+            console.log('[Auth] No profile found, creating from user metadata')
+            
+            const fullName = user.user_metadata?.full_name || 
+                            user.user_metadata?.name ||
+                            user.email?.split('@')[0] || 
+                            'User'
+            const companyName = user.user_metadata?.company_name || null
+            
+            const { data: newProfile, error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                email: user.email!,
+                full_name: fullName,
+                company_name: companyName,
+                role: 'admin',
+                plan_type: 'free',
+              })
+              .select()
+              .single()
+            
+            if (insertError) {
+              console.error('[Auth] Error creating profile:', insertError)
+              // Create a fallback profile from user metadata
+              set({ 
+                profile: {
+                  id: user.id,
+                  email: user.email!,
+                  full_name: fullName,
+                  company_name: companyName,
+                  avatar_url: user.user_metadata?.avatar_url || null,
+                  role: 'admin',
+                  plan_type: 'free',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                } as Profile
+              })
+              return
+            }
+            
+            data = newProfile
+          } else if (error) {
             console.error('[Auth] Error fetching profile:', error)
             return
           }
+
+          // Ensure full_name has a value (fallback to user metadata)
+          if (data && !data.full_name) {
+            data.full_name = user.user_metadata?.full_name || 
+                            user.user_metadata?.name ||
+                            user.email?.split('@')[0] || 
+                            'User'
+          }
           
-          console.log('[Auth] Profile fetched:', data?.email)
+          console.log('[Auth] Profile fetched:', data?.email, data?.full_name)
           set({ profile: data })
         } catch (error) {
           console.error('[Auth] Error fetching profile:', error)
@@ -378,6 +432,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   } else if (event === 'SIGNED_OUT') {
     setUser(null)
     setProfile(null)
+    clearWorkspaceCache()
   } else if (event === 'PASSWORD_RECOVERY') {
     // User clicked password reset link
     console.log('[Auth] Password recovery mode')

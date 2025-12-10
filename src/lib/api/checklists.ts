@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getOrCreateDefaultWorkspace } from '@/lib/workspace'
 import type { Checklist, ChecklistItem, ChecklistWithItems } from '@/types'
 import type { ChecklistTemplate } from '@/lib/templates-data'
 
@@ -7,7 +8,7 @@ const ASSIGNED_TASK_SELECT = `
   checklists!inner (
     id,
     title,
-    user_id
+    workspace_id
   ),
   assignee:profiles!checklist_items_assigned_to_fkey (
     id,
@@ -17,8 +18,9 @@ const ASSIGNED_TASK_SELECT = `
   )
 `
 
-// Fetch all checklists for the current user
+// Fetch all checklists for the active workspace
 export async function getChecklists() {
+  // This function is kept for compatibility; ensure workspace_id is enforced in RLS
   const { data: checklists, error } = await supabase
     .from('checklists')
     .select(`
@@ -31,7 +33,7 @@ export async function getChecklists() {
   return checklists as ChecklistWithItems[]
 }
 
-// Fetch a single checklist by ID
+// Fetch a single checklist by ID (RLS-enforced)
 export async function getChecklist(id: string) {
   const { data, error } = await supabase
     .from('checklists')
@@ -46,18 +48,21 @@ export async function getChecklist(id: string) {
   return data as ChecklistWithItems
 }
 
-// Create a new checklist
+// Create a new checklist (requires workspaceId and user_id)
 export async function createChecklist(input: {
   title: string
   description?: string
   category?: string
+  workspaceId: string
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  if (!input.workspaceId) throw new Error('Workspace ID is required')
 
   const { data, error } = await supabase
     .from('checklists')
     .insert({
+      workspace_id: input.workspaceId,
       user_id: user.id,
       title: input.title,
       description: input.description || null,
@@ -73,10 +78,12 @@ export async function createChecklist(input: {
 export async function createChecklistFromTemplate(template: ChecklistTemplate) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const { workspaceId } = await getOrCreateDefaultWorkspace()
 
   const { data: checklist, error } = await supabase
     .from('checklists')
     .insert({
+      workspace_id: workspaceId,
       user_id: user.id,
       title: template.name,
       description: template.description,
@@ -129,10 +136,12 @@ export async function duplicateChecklist(id: string) {
   if (!user) throw new Error('Not authenticated')
 
   const original = await getChecklist(id)
+  const workspaceId = original.workspace_id
 
   const { data: newChecklist, error } = await supabase
     .from('checklists')
     .insert({
+      workspace_id: workspaceId,
       user_id: user.id,
       title: `${original.title} (Copy)`,
       description: original.description,
@@ -172,10 +181,13 @@ export async function updateChecklist(id: string, input: {
   category?: string | null
   is_public?: boolean
 }) {
+  const { workspaceId } = await getOrCreateDefaultWorkspace()
+
   const { data, error } = await supabase
     .from('checklists')
     .update(input)
     .eq('id', id)
+    .eq('workspace_id', workspaceId)
     .select()
     .single()
 
@@ -185,6 +197,8 @@ export async function updateChecklist(id: string, input: {
 
 // Delete a checklist with proper cascade handling
 export async function deleteChecklist(id: string) {
+  const { workspaceId } = await getOrCreateDefaultWorkspace()
+
   try {
     // Step 1: Delete all checklist items first (handles trigger issues)
     const { error: itemsError } = await supabase
@@ -213,6 +227,7 @@ export async function deleteChecklist(id: string) {
       .from('checklists')
       .delete()
       .eq('id', id)
+      .eq('workspace_id', workspaceId)
 
     if (checklistError) {
       console.error('DELETE CHECKLIST ERROR:', {
@@ -221,7 +236,7 @@ export async function deleteChecklist(id: string) {
         details: checklistError.details,
         hint: checklistError.hint,
       })
-      
+
       // Provide user-friendly error message based on error code
       if (checklistError.code === '23503') {
         throw new Error('Cannot delete: This checklist has related data that prevents deletion')
@@ -246,6 +261,8 @@ export async function addChecklistItem(checklistId: string, input: {
   due_date?: string
   order?: number
 }) {
+  const { workspaceId: _workspaceId } = await getOrCreateDefaultWorkspace()
+
   // Get the current max order
   const { data: items } = await supabase
     .from('checklist_items')
@@ -281,6 +298,8 @@ export async function updateChecklistItem(id: string, input: {
   order?: number
   assigned_to?: string | null
 }) {
+  const { workspaceId: _workspaceId } = await getOrCreateDefaultWorkspace()
+
   const { data, error } = await supabase
     .from('checklist_items')
     .update(input)
@@ -309,7 +328,7 @@ export async function deleteChecklistItem(id: string) {
 
 // Reorder checklist items
 export async function reorderChecklistItems(items: { id: string; order: number }[]) {
-  const updates = items.map(item => 
+  const updates = items.map(item =>
     supabase
       .from('checklist_items')
       .update({ order: item.order })
@@ -323,11 +342,13 @@ export async function reorderChecklistItems(items: { id: string; order: number }
 export async function getAssignedToMeTasks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const { workspaceId } = await getOrCreateDefaultWorkspace()
 
   const { data, error } = await supabase
     .from('checklist_items')
     .select(ASSIGNED_TASK_SELECT)
     .eq('assigned_to', user.id)
+    .eq('checklists.workspace_id', workspaceId)
     .eq('is_completed', false)
     .order('due_date', { ascending: true, nullsFirst: false })
     .limit(10)
@@ -340,11 +361,12 @@ export async function getAssignedToMeTasks() {
 export async function getAssignedToOthersTasks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const { workspaceId } = await getOrCreateDefaultWorkspace()
 
   const { data, error } = await supabase
     .from('checklist_items')
     .select(ASSIGNED_TASK_SELECT)
-    .eq('checklists.user_id', user.id)
+    .eq('checklists.workspace_id', workspaceId)
     .not('assigned_to', 'is', null)
     .neq('assigned_to', user.id)
     .eq('is_completed', false)
@@ -359,6 +381,7 @@ export async function getAssignedToOthersTasks() {
 export async function getDashboardStats() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const { workspaceId } = await getOrCreateDefaultWorkspace()
 
   // Get all checklists with items
   const { data: checklists, error } = await supabase
@@ -367,6 +390,7 @@ export async function getDashboardStats() {
       *,
       checklist_items (*)
     `)
+    .eq('workspace_id', workspaceId)
 
   if (error) throw error
 
@@ -385,7 +409,7 @@ export async function getDashboardStats() {
     totalItems += items.length
     const completed = items.filter(item => item.is_completed).length
     completedItems += completed
-    
+
     if (items.length > 0 && completed === items.length) {
       completedChecklists++
     }
@@ -401,8 +425,8 @@ export async function getDashboardStats() {
     }
   })
 
-  const averageProgress = totalItems > 0 
-    ? Math.round((completedItems / totalItems) * 100) 
+  const averageProgress = totalItems > 0
+    ? Math.round((completedItems / totalItems) * 100)
     : 0
 
   // Activity log simulation (fetching recent item updates)
@@ -418,6 +442,7 @@ export async function getDashboardStats() {
       )
     `)
     .eq('is_completed', true)
+    .eq('checklists.workspace_id', workspaceId)
     .order('updated_at', { ascending: false })
     .limit(5)
 
@@ -426,6 +451,7 @@ export async function getDashboardStats() {
     .from('checklist_items')
     .select('id', { count: 'exact', head: true })
     .eq('assigned_to', user.id)
+    .eq('checklists.workspace_id', workspaceId)
     .eq('is_completed', false)
 
   return {
@@ -446,10 +472,11 @@ export async function getDashboardStats() {
 export async function getTodaysTasks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const { workspaceId } = await getOrCreateDefaultWorkspace()
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  
+
   const endOfToday = new Date(today)
   endOfToday.setHours(23, 59, 59, 999)
 
@@ -460,12 +487,13 @@ export async function getTodaysTasks() {
       checklists!inner (
         id,
         title,
-        user_id
+        workspace_id
       )
     `)
     .not('due_date', 'is', null)
     .gte('due_date', today.toISOString())
     .lte('due_date', endOfToday.toISOString())
+    .eq('checklists.workspace_id', workspaceId)
     .eq('is_completed', false)
     .order('due_date', { ascending: true })
 
@@ -477,6 +505,7 @@ export async function getTodaysTasks() {
 export async function getUpcomingTasks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const { workspaceId } = await getOrCreateDefaultWorkspace()
 
   // Get tasks from the past (overdue) up to 7 days in the future
   const sevenDaysFromNow = new Date()
@@ -490,11 +519,12 @@ export async function getUpcomingTasks() {
       checklists!inner (
         id,
         title,
-        user_id
+        workspace_id
       )
     `)
     .not('due_date', 'is', null)
     .lte('due_date', sevenDaysFromNow.toISOString())
+    .eq('checklists.workspace_id', workspaceId)
     .eq('is_completed', false)
     .order('due_date', { ascending: true })
     .limit(15)
